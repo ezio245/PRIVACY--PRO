@@ -13,38 +13,107 @@
       <form id="loginForm">
         <label for="loginUsername" class="form-label">Username</label>
         <input id="loginUsername" class="form-control" required>
+        
         <label for="loginPassword" class="form-label">Password</label>
         <input id="loginPassword" class="form-control" type="password" required>
+        
         <button type="submit" class="btn btn--primary" style="margin-top:1rem;">Login</button>
       </form>
+      
       <div id="loginError" class="auth-error"></div>
+      
       <div class="auth-switch">
         <span>Don't have an account?</span>
         <a href="register.html">Register</a>
       </div>
     </div>
   </main>
+
   <script>
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      
       const username = document.getElementById('loginUsername').value.trim();
       const password = document.getElementById('loginPassword').value;
+      const errorDiv = document.getElementById('loginError');
+      
+      // Clear previous errors
+      errorDiv.textContent = '';
+      
+      // Show loading state
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Logging in...';
+      submitBtn.disabled = true;
+      
       try {
-        const res = await fetch('http://localhost:3001/api/login', {
+        // Use relative URL that works both locally and on Render
+        const apiUrl = '/api/login';
+        
+        const response = await fetch(apiUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: JSON.stringify({ username, password })
         });
-        if (!res.ok) throw new Error('Invalid credentials');
-        const { token, role } = await res.json();
-        localStorage.setItem('jwt', token);
-        localStorage.setItem('role', role);
-        window.location.href = 'index.html';
-      } catch (err) {
-        document.getElementById('loginError').textContent = err.message;
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Login failed');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Store authentication data
+          localStorage.setItem('jwt', data.token || 'demo-token');
+          localStorage.setItem('role', data.role || 'user');
+          localStorage.setItem('username', username);
+          
+          // Show success message
+          errorDiv.style.color = 'green';
+          errorDiv.textContent = 'Login successful! Redirecting...';
+          
+          // Redirect to dashboard
+          setTimeout(() => {
+            window.location.href = 'index.html';
+          }, 1000);
+        } else {
+          throw new Error(data.message || 'Login failed');
+        }
+        
+      } catch (error) {
+        console.error('Login error:', error);
+        
+        // Handle different error types
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          errorDiv.textContent = 'Network error. Please check your connection.';
+        } else {
+          errorDiv.textContent = error.message || 'An error occurred during login';
+        }
+        
+        errorDiv.style.color = 'red';
+      } finally {
+        // Restore button state
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
       }
+    });
+
+    // Add demo credentials hint
+    window.addEventListener('load', () => {
+      const hint = document.createElement('div');
+      hint.innerHTML = `
+        <div style="margin-top: 1rem; padding: 0.75rem; background-color: #f0f9ff; border: 1px solid #bfdbfe; border-radius: 0.375rem; font-size: 0.875rem;">
+          <strong>Demo Credentials:</strong><br>
+          Username: <code>admin</code><br>
+          Password: <code>admin123</code>
+        </div>
+      `;
+      document.querySelector('.auth-card').appendChild(hint);
     });
   </script>
 </body>
 </html>
-
